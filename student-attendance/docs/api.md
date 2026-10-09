@@ -46,7 +46,7 @@ Invalid credentials → `400 {"detail":"Invalid credentials."}` (generic, no use
 | GET/POST | `/api/v1/teacher-profiles/` | Admin | `{user, employee_number, department}` |
 | GET | `/api/v1/teacher/classes/` | Teacher (+Admin sees all) | Assigned classes |
 | GET | `/api/v1/classes/{id}/students/` | Admin/assigned teacher | Roster `{classroom, students[]}`; student → 404 |
-| GET/POST | `/api/v1/attendance/sessions/` | Admin/assigned teacher | List (filters `classroom,subject,status,date,date_from,date_to`) / create atomic |
+| GET/POST | `/api/v1/attendance/sessions/` | Admin/assigned teacher (+class teacher for whole-day) | List (filters `classroom,subject,status,date,date_from,date_to`) / create atomic. Omit `subject` for a whole-day session (class teacher only) |
 | GET/PATCH | `/api/v1/attendance/sessions/{id}/` | Scoped | Read; PATCH `date` only if DRAFT |
 | POST | `/api/v1/attendance/sessions/{id}/submit/` | Scoped | DRAFT→SUBMITTED, audit |
 | POST | `/api/v1/attendance/sessions/{id}/corrections/` | DRAFT: assigned/admin; SUBMITTED: admin only | `{reason>=5 chars, records[]}`, audit |
@@ -55,8 +55,10 @@ Invalid credentials → `400 {"detail":"Invalid credentials."}` (generic, no use
 | GET | `/api/v1/teacher/assignments/` | Teacher (own) / Admin (all) | Assigned class+subject combos for marking UI |
 | GET | `/api/v1/attendance/sessions/{id}/audit/` | Admin/assigned teacher | Audit trail `{session, events[]}` |
 | POST | `/api/v1/auth/password/change/` | Authenticated | `{old_password, new_password}` → validated, updates hash |
-| GET | `/api/v1/reports/attendance/summary/` | Admin/assigned teacher/student-self | Aggregates + policy |
-| GET | `/api/v1/reports/attendance/export.csv` | Scoped (student=self only) | CSV download, formula-safe |
+| GET | `/api/v1/reports/attendance/summary/` | Admin/assigned teacher/student-self | Aggregates + policy. `by_subject=1` splits rows per subject (English 2, Science 1…) |
+| GET | `/api/v1/reports/attendance/daily-summary/?classroom=<id>` | Admin/assigned or class teacher | Whole-day day counts: `{student, username, student_number, days_present, days_total, percentage}` |
+| GET | `/api/v1/reports/attendance/daily-export.csv?classroom=<id>` | Same scope | Same rows as CSV |
+| GET | `/api/v1/reports/attendance/export.csv` | Scoped (student=self only) | CSV download, formula-safe; gains a `subject` column in by-subject mode |
 
 ## Attendance examples
 

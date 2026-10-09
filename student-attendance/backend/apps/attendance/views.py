@@ -13,8 +13,10 @@ from rest_framework.views import APIView
 
 from apps.academics.scopes import (
     is_admin,
+    is_class_teacher_of,
     teacher_can_access_classroom,
     teacher_can_access_subject_in_class,
+    teacher_can_view_classroom,
     teacher_classroom_ids,
 )
 
@@ -35,7 +37,12 @@ def scoped_session_queryset(user):
     if is_admin(user):
         return base.all().order_by("-date", "-id")
     if user.role == "TEACHER":
-        ids = teacher_classroom_ids(user)
+        from apps.academics.models import Classroom
+
+        ids = set(teacher_classroom_ids(user))
+        ids.update(
+            Classroom.objects.filter(class_teacher=user).values_list("id", flat=True)
+        )
         return base.filter(classroom_id__in=ids).order_by("-date", "-id")
     # Students must use /students/me/attendance/ ; deny session listing
     return base.none()
@@ -70,8 +77,8 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         obj = self.get_object()
-        # extra guard: teacher must still be assigned (queryset already scoped, double-check)
-        if not is_admin(request.user) and not teacher_can_access_classroom(
+        # extra guard: teacher must still reach the room (queryset already scoped, double-check)
+        if not is_admin(request.user) and not teacher_can_view_classroom(
             request.user, obj.classroom_id
         ):
             return Response({"detail": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
@@ -100,8 +107,15 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Provide 'date' to patch."}, status=status.HTTP_400_BAD_REQUEST)
         if not (
             is_admin(request.user)
-            or teacher_can_access_subject_in_class(
-                request.user, session.classroom_id, session.subject_id
+            or (
+                session.subject_id is None
+                and is_class_teacher_of(request.user, session.classroom_id)
+            )
+            or (
+                session.subject_id is not None
+                and teacher_can_access_subject_in_class(
+                    request.user, session.classroom_id, session.subject_id
+                )
             )
         ):
             return Response({"detail": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
@@ -121,9 +135,11 @@ class SessionSubmitView(APIView):
     @extend_schema(responses=AttendanceSessionSerializer)
     def post(self, request, pk):
         session = get_object_or_404(AttendanceSession, pk=pk)
-        # scope check
-        if not is_admin(request.user) and not teacher_can_access_classroom(
-            request.user, session.classroom_id
+        # scope check (class teachers reach their room via class-teacher role)
+        if not (
+            is_admin(request.user)
+            or teacher_can_access_classroom(request.user, session.classroom_id)
+            or is_class_teacher_of(request.user, session.classroom_id)
         ):
             return Response({"detail": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
         session = submit_session(request.user, session)

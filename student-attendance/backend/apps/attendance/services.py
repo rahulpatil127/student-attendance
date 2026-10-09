@@ -16,8 +16,23 @@ User = get_user_model()
 def _ensure_can_mark(user, classroom_id, subject_id):
     if is_admin(user):
         return
+    if subject_id is None:
+        _ensure_can_mark_daily(user, classroom_id)
+        return
     if not teacher_can_access_subject_in_class(user, classroom_id, subject_id):
         raise PermissionDenied("Not assigned to this class/subject.")
+
+
+def _ensure_can_mark_daily(user, classroom_id):
+    """Whole-day sessions belong to the class teacher (the boss of the class)."""
+    if is_admin(user):
+        return
+    try:
+        classroom = Classroom.objects.only("class_teacher").get(pk=classroom_id)
+    except Classroom.DoesNotExist as exc:
+        raise ValidationError({"classroom": "Classroom not found."}) from exc
+    if classroom.class_teacher_id != user.id:
+        raise PermissionDenied("Only the class teacher can mark whole-day attendance.")
 
 
 def _enrolled_student_ids(classroom):
@@ -36,10 +51,21 @@ def create_session_with_records(user, classroom_id, subject_id, date_value, reco
         raise ValidationError({"classroom": "Classroom not found."}) from exc
     from apps.academics.models import Subject
 
-    try:
-        subject = Subject.objects.get(pk=subject_id)
-    except Subject.DoesNotExist as exc:
-        raise ValidationError({"subject": "Subject not found."}) from exc
+    subject = None
+    if subject_id is not None:
+        try:
+            subject = Subject.objects.get(pk=subject_id)
+        except Subject.DoesNotExist as exc:
+            raise ValidationError({"subject": "Subject not found."}) from exc
+    else:
+        # One whole-day session per classroom+date (NULLs never collide in the
+        # unique constraint, so guard explicitly).
+        if AttendanceSession.objects.filter(
+            classroom=classroom, subject__isnull=True, date=date_value
+        ).exists():
+            raise ValidationError(
+                {"detail": "A whole-day session already exists for this class/date."}
+            )
 
     enrolled = _enrolled_student_ids(classroom)
     for r in records_data:

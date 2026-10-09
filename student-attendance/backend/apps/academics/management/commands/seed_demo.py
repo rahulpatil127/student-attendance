@@ -157,10 +157,13 @@ class Command(BaseCommand):
             for username, email, first, last, number, key in STUDENTS:
                 s = get_or_create_user(username, email, first, last, "STUDENT", username)
                 StudentProfile.objects.get_or_create(user=s, defaults={"student_number": number})
-                Enrollment.objects.get_or_create(
-                    student=s, classroom=rooms[key], academic_year=year,
-                    defaults={"status": "ACTIVE"},
-                )
+                with suppress(ValidationError, IntegrityError, APIValidationError):
+                    # Skipped if the admin already placed this student in another
+                    # class (one active enrollment per student).
+                    Enrollment.objects.get_or_create(
+                        student=s, classroom=rooms[key], academic_year=year,
+                        defaults={"status": "ACTIVE"},
+                    )
                 students[username] = s
 
             for tname, key, code in ASSIGNMENTS:

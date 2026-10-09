@@ -299,3 +299,88 @@ class Phase5ApiTests(TestCase):
         self.assertTrue(
             StudentProfile.objects.filter(user=stu).exists()
         )
+
+    def test_class_teacher_daily_flow(self):
+        d = self.d
+        # admin names t1 class teacher of c1
+        self.client.force_login(d["admin"])
+        r = self.client.patch(
+            f"/api/v1/classrooms/{d['c1'].id}/",
+            {"class_teacher": d["t1"].id},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.json()["class_teacher"], d["t1"].id)
+        # student cannot be class teacher
+        r = self.client.patch(
+            f"/api/v1/classrooms/{d['c1'].id}/",
+            {"class_teacher": d["s1"].id},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 400)
+        # class teacher marks whole-day (no subject)
+        self.client.force_login(d["t1"])
+        payload = {
+            "classroom": d["c1"].id,
+            "date": "2025-09-01",
+            "records": [{"student": d["s1"].id, "status": "PRESENT"}],
+        }
+        r = self.client.post("/api/v1/attendance/sessions/", payload, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertIsNone(r.json()["subject"])
+        sid = r.json()["id"]
+        # duplicate whole-day same date blocked
+        r = self.client.post("/api/v1/attendance/sessions/", payload, format="json")
+        self.assertEqual(r.status_code, 400)
+        # submit works for class teacher
+        r = self.client.post(f"/api/v1/attendance/sessions/{sid}/submit/", {}, format="json")
+        self.assertEqual(r.status_code, 200)
+        # unrelated teacher cannot mark whole-day
+        t2 = User.objects.create_user(
+            username="tx", email="tx@ex.com", password="StrongPass123", role="TEACHER"
+        )
+        self.client.force_login(t2)
+        r = self.client.post(
+            "/api/v1/attendance/sessions/",
+            {"classroom": d["c1"].id, "date": "2025-09-02",
+             "records": [{"student": d["s1"].id, "status": "PRESENT"}]},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_by_subject_split_and_daily_summary(self):
+        d = self.d
+        self.client.force_login(d["t1"])
+        r = self.client.post(
+            "/api/v1/attendance/sessions/",
+            {
+                "classroom": d["c1"].id,
+                "subject": d["math"].id,
+                "date": "2025-08-01",
+                "records": [{"student": d["s1"].id, "status": "PRESENT"}],
+            },
+            format="json",
+        )
+        sid = r.json()["id"]
+        self.client.post(f"/api/v1/attendance/sessions/{sid}/submit/", {}, format="json")
+        self.client.force_login(d["admin"])
+        r = self.client.get("/api/v1/reports/attendance/summary/?by_subject=1")
+        self.assertEqual(r.status_code, 200)
+        row = r.json()["results"][0]
+        self.assertEqual(row["subject_name"], "Maths")
+        self.assertEqual(row["present"], 1)
+        # daily summary empty without whole-day sessions
+        r = self.client.get(f"/api/v1/reports/attendance/daily-summary/?classroom={d['c1'].id}")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["results"], [])
+        # missing classroom rejected
+        r = self.client.get("/api/v1/reports/attendance/daily-summary/")
+        self.assertEqual(r.status_code, 400)
+        # subject-filtered totals carry the subject name
+        r = self.client.get(f"/api/v1/reports/attendance/summary/?subject={d['math'].id}")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["results"][0]["subject_name"], "Maths")
+        # daily CSV export mirrors the JSON rows
+        r = self.client.get(f"/api/v1/reports/attendance/daily-export.csv?classroom={d['c1'].id}")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("days_present", r.content.decode())

@@ -8,7 +8,7 @@ from .models import AttendanceRecord, AttendanceSession
 class AttendanceRecordSerializer(serializers.ModelSerializer):
     student_username = serializers.CharField(source="student.username", read_only=True)
     session_date = serializers.DateField(source="session.date", read_only=True)
-    subject_name = serializers.CharField(source="session.subject.name", read_only=True)
+    subject_name = serializers.SerializerMethodField()
     classroom_name = serializers.CharField(source="session.classroom.name", read_only=True)
 
     class Meta:
@@ -27,6 +27,10 @@ class AttendanceRecordSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("id", "marked_by")
 
+    def get_subject_name(self, obj):
+        subject = getattr(obj.session, "subject", None)
+        return subject.name if subject else "Whole day"
+
 
 class RecordInputSerializer(serializers.Serializer):
     student = serializers.IntegerField()
@@ -36,7 +40,7 @@ class RecordInputSerializer(serializers.Serializer):
 
 class SessionCreateSerializer(serializers.Serializer):
     classroom = serializers.IntegerField()
-    subject = serializers.IntegerField()
+    subject = serializers.IntegerField(required=False, allow_null=True, default=None)
     date = serializers.DateField()
     records = RecordInputSerializer(many=True)
 
@@ -52,7 +56,7 @@ class SessionCreateSerializer(serializers.Serializer):
 class AttendanceSessionSerializer(serializers.ModelSerializer):
     records = AttendanceRecordSerializer(many=True, read_only=True)
     classroom_display = serializers.CharField(source="classroom.__str__", read_only=True)
-    subject_display = serializers.CharField(source="subject.__str__", read_only=True)
+    subject_display = serializers.SerializerMethodField()
     counts = serializers.SerializerMethodField()
 
     class Meta:
@@ -72,6 +76,11 @@ class AttendanceSessionSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = ("id", "created_by", "status", "created_at", "updated_at")
+
+    def get_subject_display(self, obj):
+        if obj.subject_id is None:
+            return "Whole day"
+        return str(obj.subject)
 
     def get_counts(self, obj):
         records = getattr(obj, "prefetched_records", None)

@@ -26,11 +26,32 @@ class AcademicYearSerializer(serializers.ModelSerializer):
 
 class ClassroomSerializer(serializers.ModelSerializer):
     academic_year_name = serializers.CharField(source="academic_year.name", read_only=True)
+    class_teacher_username = serializers.CharField(
+        source="class_teacher.username", read_only=True, default=""
+    )
 
     class Meta:
         model = Classroom
-        fields = ("id", "name", "section", "academic_year", "academic_year_name", "is_active")
+        fields = (
+            "id",
+            "name",
+            "section",
+            "academic_year",
+            "academic_year_name",
+            "class_teacher",
+            "class_teacher_username",
+            "is_active",
+        )
         read_only_fields = ("id",)
+
+    def validate_class_teacher(self, value):
+        if value is None:
+            return value
+        if value.role not in ("TEACHER", "ADMIN") and not value.is_superuser:
+            raise serializers.ValidationError("Class teacher must be a teacher account.")
+        if not value.is_active:
+            raise serializers.ValidationError("Class teacher account is inactive.")
+        return value
 
 
 class SubjectSerializer(serializers.ModelSerializer):

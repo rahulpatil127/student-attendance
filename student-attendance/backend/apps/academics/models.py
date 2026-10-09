@@ -34,6 +34,14 @@ class Classroom(models.Model):
     name = models.CharField(max_length=64, help_text="Class name, e.g. Class 10")
     section = models.CharField(max_length=16, default="A")
     academic_year = models.ForeignKey(AcademicYear, on_delete=models.PROTECT, related_name="classrooms")
+    class_teacher = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="class_teacher_of",
+        help_text="Boss of the class: takes one whole-day attendance daily.",
+    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -46,6 +54,20 @@ class Classroom(models.Model):
         ]
         indexes = [models.Index(fields=["academic_year", "name"])]
         ordering = ["academic_year__name", "name", "section"]
+
+    def clean(self):
+        if self.class_teacher_id:
+            from django.contrib.auth import get_user_model
+
+            u = get_user_model().objects.filter(pk=self.class_teacher_id).first()
+            if u and u.role not in ("TEACHER", "ADMIN") and not u.is_superuser:
+                raise ValidationError("Class teacher must be a teacher account.")
+            if u and not u.is_active:
+                raise ValidationError("Class teacher account is inactive.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.name}-{self.section} ({self.academic_year})"

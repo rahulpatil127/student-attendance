@@ -130,7 +130,7 @@ function UsersPage() {
       await load();
     } catch (e) {
       setSuccess(null);
-      setError(errMsg(e) + " (Records with attendance history are protected \u2014 deactivate instead.)");
+      setError(errMsg(e));
       setDeleting(null);
     } finally {
       setBusy(false);

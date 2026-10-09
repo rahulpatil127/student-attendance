@@ -100,6 +100,7 @@ Record each decision with date, context, decision, alternatives, and consequence
 - `POST /admin/users/bulk/` (admin-only): upload `.xlsx`/`.csv` (`username,firstname,lastname,email`) → STUDENT accounts, password = firstname, IDs auto-generated. Per-row errors reported; teacher uploads → 403. Needs `openpyxl` (added to requirements).
 - Accounts table gains a class dropdown (`?classroom=` = active enrollments) so long student lists filter by class.
 - Verified: 45/45 backend tests, ruff clean, frontend lint/build pass.
+- `sample-data/students_sample.{csv,xlsx}`: 10 fresh students, parser-verified, zero clashes; bulk-enrolled live into Class 9-A with username-passwords.
 
 ## 2026-10-05 — Duplicate names, class at creation, promote (user request)
 - Bulk upload no longer rejects taken usernames: `sara` (taken) becomes `sara2`, reported via `renamed_from`. Same-name students coexist, told apart by username + auto ID + last name.
@@ -113,10 +114,37 @@ Record each decision with date, context, decision, alternatives, and consequence
 - Promoted leftovers: `DELETE /enrollments/clear-inactive/?classroom=<id>` + UI button (two-click confirm) deletes INACTIVE rows of one class at once; history (sessions) untouched.
 - Verified: 49/49 backend tests, ruff clean, frontend lint/build pass.
 
-## 2026-10-05 — Teacher filters + assignment edit (user request)
-- Assignments API gains `?subject=` filter (teacher/class/year existed).
+## 2026-10-05 — Teacher filters + assignment edit (user request)- Assignments API gains `?subject=` filter (teacher/class/year existed).
 - `/admin/teachers` table filters by teacher, class, and subject dropdowns; each row has Edit (class, subject, active toggle) with year auto-matched.
 - Verified: 50/50 backend tests, ruff clean, frontend lint/build pass.
+
+## 2026-10-09 — Reports simplified to instant filtering (user request)
+- Filters apply the moment they change — no Apply button to hunt for. Live "Showing: …" line always tells you the current scope, with one-click Reset.
+- Teachers now get a real subject list (built from their own assignments; previously empty).
+- Empty trend hidden instead of a dead "No trend data" box.
+- Verified: frontend lint/build pass (backend untouched).
+
+## 2026-10-09 — Class reports show current members; dates show history (user request)
+- Problem: moved-out students appeared in both their old class and new class reports (history matched the class filter).
+- Rule: filtering one class with no dates now shows only ACTIVELY enrolled members; add From/To dates to see full history including moved students. CSV export follows the same rule.
+- Verified: 51/51 backend tests (new current-vs-history test), frontend lint/build pass.
+
+## 2026-10-09 — Subject-wise reports + class-teacher whole-day attendance (user request)
+- Reports table splits per subject by default (`dev` → English 2, Science 1); CSV gains a `subject` column. API: `?by_subject=1`.
+- New class-teacher role: `Classroom.class_teacher` (admin sets it in Academics edit; demo: anita → Class 10, ravi → Class 9). Only the class teacher (or admin) can mark a whole-day session (`subject` omitted, one per class/day, duplicate-guarded).
+- New days report `GET /reports/attendance/daily-summary/?classroom=<id>` + UI card: days present / days total per student = "how many days came to college".
+- Teacher dashboard shows class-teacher duties with links to `/teacher/daily/:id` marking pages; roster endpoint admits class teachers.
+- Verified: 53/53 backend tests, ruff clean, frontend lint/build pass.
+
+## 2026-10-09 — Compact subject view + days CSV (user request)
+- Students table no longer dumps every student × subject: with no subject picked it shows one compact row per student (Subject = All); picking a subject shows only that subject's rows.
+- Class-teacher days card gains **Export days CSV** (`daily-export.csv` for the selected class + dates).
+- Verified: backend tests, ruff clean, frontend lint/build pass.
+
+## 2026-10-09 — Subject CSV per table + clean protected-delete errors (user request)
+- Students table has its own **Export this view (CSV)** — exports exactly the filtered view (teachers use it for their subject data too).
+- Deleting a referenced object (e.g. a class with enrollments) now returns clean `400 {"detail": "Cannot delete: protected by N related records…"}` via a global handler instead of an HTML 500 the app couldn't parse; the API client also degrades gracefully on non-JSON responses.
+- Verified: 54/54 backend tests, ruff clean, frontend lint/build pass.
 
 ## 2026-10-04 — Auto IDs, bulk-candidate + manisha fixes (user screenshots)
 - Student/employee numbers auto-generate (`S021…`, `T006…`) when left blank: profile endpoints accept missing numbers; enrolling a student without a profile auto-creates one. User form hints updated.
@@ -158,3 +186,8 @@ Record each decision with date, context, decision, alternatives, and consequence
 - All 27 source files converted `.ts`/`.tsx` → `.js`/`.jsx` via mechanical type-stripping (esbuild transform); behavior identical.
 - Removed: `typescript`, `@types/*`, `@typescript-eslint/*` deps, `tsconfig*.json`, `src/vite-env.d.ts`, `typecheck` script. Build is now `vite build` only; lint covers `.js`/`.jsx`.
 - Stack docs updated everywhere: README, `ai-contax/` (architecture, rules, plan), `README.pack.md`, this log.
+
+## 2026-10-09 — Demo DB refreshed, all passwords = usernames (user request)
+- `seed_demo` now skips students the admin already placed elsewhere (one-active rule crashed it on a moved student) instead of failing.
+- Reset all 32 teacher/student passwords to their usernames (verified `anita`, `rahul`, `tarkeshvar`, `manisha` log in); admin untouched.
+- Live DB: 33 users (1 admin + 6 teachers + 26 students), your custom classes kept.

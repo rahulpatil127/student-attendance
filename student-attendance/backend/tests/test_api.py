@@ -128,6 +128,13 @@ class AcademicsApiTests(TestCase):
         )
         self.assertEqual(r.status_code, 400, r.content)
 
+    def test_protected_delete_returns_clean_400(self):
+        # c1 has enrollments; deleting it must 400 JSON, never an HTML 500.
+        self.client.force_login(self.d["admin"])
+        r = self.client.delete(f"/api/v1/classrooms/{self.d['c1'].id}/")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("protected", r.json()["detail"].lower())
+
     def test_single_enroll_reactivates_inactive(self):
         from apps.academics.models import Enrollment
 
@@ -278,11 +285,28 @@ class ReportingApiTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()["count"], 1)
 
+    def test_summary_classroom_current_members_vs_history(self):
+        from apps.academics.models import Enrollment
+
+        self.client.force_login(self.d["admin"])
+        cid = self.d["c1"].id
+        # both s1/s2 have records in c1; move s2 out
+        Enrollment.objects.filter(student=self.d["s2"]).update(status="INACTIVE")
+        r = self.client.get(f"/api/v1/reports/attendance/summary/?classroom={cid}")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual([x["username"] for x in r.json()["results"]], ["s1"])
+        # with a date range, history owners reappear
+        r = self.client.get(
+            f"/api/v1/reports/attendance/summary/?classroom={cid}&date_from=2025-01-01"
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["count"], 2)
+
     def test_export_csv_safe(self):
         self.client.force_login(self.d["admin"])
         r = self.client.get("/api/v1/reports/attendance/export.csv")
         self.assertEqual(r.status_code, 200)
         self.assertIn("text/csv", r["Content-Type"])
         content = r.content.decode()
-        self.assertIn("student_id,username,student_number,present", content)
+        self.assertIn("student_id,username,student_number,subject,present", content)
         self.assertIn("s1", content)

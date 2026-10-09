@@ -22,7 +22,7 @@ from .models import (
     TeacherProfile,
     TeachingAssignment,
 )
-from .scopes import is_admin, teacher_can_access_classroom, teacher_classroom_ids
+from .scopes import is_admin, teacher_classroom_ids
 from .serializers import (
     AcademicYearSerializer,
     ClassroomSerializer,
@@ -236,8 +236,10 @@ class ClassRosterView(APIView):
 
     @extend_schema(responses={"type": "object"})
     def get(self, request, pk):
+        from apps.academics.scopes import teacher_can_view_classroom
+
         classroom = get_object_or_404(Classroom, pk=pk)
-        if not teacher_can_access_classroom(request.user, classroom.id):
+        if not teacher_can_view_classroom(request.user, classroom.id):
             # 404 to avoid disclosing existence to unauthorized students
             if request.user.role == "STUDENT":
                 return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)

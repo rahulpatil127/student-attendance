@@ -15,6 +15,7 @@ function AcademicsPage() {
   const [years, setYears] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [subjects, setSubjects] = useState([]);
+  const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [ok, setOk] = useState(null);
@@ -29,15 +30,17 @@ function AcademicsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [y, c, s] = await Promise.all([
+      const [y, c, s, users] = await Promise.all([
         api("/api/v1/academic-years/?page_size=200"),
         api("/api/v1/classrooms/?page_size=200"),
-        api("/api/v1/subjects/?page_size=200")
+        api("/api/v1/subjects/?page_size=200"),
+        api("/api/v1/admin/users/?role=TEACHER&page_size=200")
       ]);
       const yl = unwrap(y);
       setYears(yl);
       setRooms(unwrap(c));
       setSubjects(unwrap(s));
+      setTeachers(unwrap(users));
       if (yl[0] && !roomForm.academic_year) setRoomForm((f) => ({ ...f, academic_year: String(yl[0].id) }));
     } catch (e) {
       setOk(null);
@@ -111,7 +114,7 @@ function AcademicsPage() {
     setOk(null);
     setError(null);
     try {
-      await api(`/api/v1/classrooms/${editRoom.id}/`, { method: "PATCH", body: JSON.stringify({ name: editRoom.name, section: editRoom.section, is_active: editRoom.is_active }) });
+      await api(`/api/v1/classrooms/${editRoom.id}/`, { method: "PATCH", body: JSON.stringify({ name: editRoom.name, section: editRoom.section, is_active: editRoom.is_active, class_teacher: editRoom.class_teacher || null }) });
       setOk("Class updated.");
       setEditRoom(null);
       await load();
@@ -146,7 +149,7 @@ function AcademicsPage() {
       await load();
     } catch (e) {
       setOk(null);
-      setError(msg(e) + " (Referenced records are protected.)");
+      setError(msg(e));
       setBye(null);
     }
   };
@@ -168,7 +171,7 @@ function AcademicsPage() {
       onClose: () => setEditRoom(null),
       actions: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Button, { variant: "secondary", onClick: () => setEditRoom(null) }, "Cancel"), /* @__PURE__ */ React.createElement(Button, { onClick: saveRoom }, "Save"))
     },
-    editRoom && /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-3" }, /* @__PURE__ */ React.createElement(Field, { label: "Name" }, /* @__PURE__ */ React.createElement(Input, { value: editRoom.name, onChange: (e) => setEditRoom({ ...editRoom, name: e.target.value }) })), /* @__PURE__ */ React.createElement(Field, { label: "Section" }, /* @__PURE__ */ React.createElement(Input, { value: editRoom.section, onChange: (e) => setEditRoom({ ...editRoom, section: e.target.value }) })), /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-2 text-sm" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: editRoom.is_active, onChange: (e) => setEditRoom({ ...editRoom, is_active: e.target.checked }) }), " Active"))
+    editRoom && /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-3" }, /* @__PURE__ */ React.createElement(Field, { label: "Name" }, /* @__PURE__ */ React.createElement(Input, { value: editRoom.name, onChange: (e) => setEditRoom({ ...editRoom, name: e.target.value }) })), /* @__PURE__ */ React.createElement(Field, { label: "Section" }, /* @__PURE__ */ React.createElement(Input, { value: editRoom.section, onChange: (e) => setEditRoom({ ...editRoom, section: e.target.value }) })), /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-2 text-sm" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: editRoom.is_active, onChange: (e) => setEditRoom({ ...editRoom, is_active: e.target.checked }) }), " Active"), /* @__PURE__ */ React.createElement(Field, { label: "Class teacher (boss of the class)" }, /* @__PURE__ */ React.createElement("select", { "aria-label": "Class teacher", className: "rounded-lg border border-slate-300 px-3 py-2 text-sm", value: editRoom.class_teacher ?? "", onChange: (e) => setEditRoom({ ...editRoom, class_teacher: e.target.value === "" ? null : Number(e.target.value) }) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "None"), teachers.map((t) => /* @__PURE__ */ React.createElement("option", { key: t.id, value: t.id }, t.username)))))
   ), /* @__PURE__ */ React.createElement(
     Dialog,
     {

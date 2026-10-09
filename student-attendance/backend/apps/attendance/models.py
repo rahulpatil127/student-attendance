@@ -28,7 +28,12 @@ class AttendanceSession(models.Model):
         "academics.Classroom", on_delete=models.PROTECT, related_name="attendance_sessions"
     )
     subject = models.ForeignKey(
-        "academics.Subject", on_delete=models.PROTECT, related_name="attendance_sessions"
+        "academics.Subject",
+        on_delete=models.PROTECT,
+        related_name="attendance_sessions",
+        null=True,
+        blank=True,
+        help_text="Empty means whole-day class-teacher attendance.",
     )
     date = models.DateField(default=timezone.localdate)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_sessions")
@@ -57,7 +62,8 @@ class AttendanceSession(models.Model):
         return super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.classroom} / {self.subject} @ {self.date} [{self.status}]"
+        subj = self.subject if self.subject_id else "Whole day"
+        return f"{self.classroom} / {subj} @ {self.date} [{self.status}]"
 
 
 class AttendanceRecord(models.Model):

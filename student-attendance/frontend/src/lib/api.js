@@ -42,7 +42,12 @@ async function api(path, options = {}) {
   }
   if (res.status === 204) return void 0;
   const text = await res.text();
-  const data = text ? JSON.parse(text) : void 0;
+  let data;
+  try {
+    data = text ? JSON.parse(text) : void 0;
+  } catch {
+    throw new ApiError(res.status, { detail: `Server error (${res.status}). Please try again.` });
+  }
   if (!res.ok) throw new ApiError(res.status, data);
   return data;
 }
