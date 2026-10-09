@@ -1,0 +1,15 @@
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "SIM", "BLE"]
+ignore = ["RUF012", "RUF059", "E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"*/migrations/*.py" = ["ALL"]
+"tests/*.py" = ["SIM117"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["test_*.py"]
