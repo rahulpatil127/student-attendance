@@ -4,16 +4,12 @@ Session-based web app for managing students, teachers, classes, subjects, enroll
 
 Stack: React.js + Vite + JavaScript, Tailwind CSS, Django + DRF, SQLite, Django session auth + CSRF.
 
-See `ai-contax/` for product context, architecture, rules, and `ai-contax/software-development-plan.md` for phased delivery.
-See `docs/` for API, data model, test plan, deployment, decisions.
 
 ## Project layout
 ```
 student-attendance/
-├── ai-contax/       # agent context (copied from handoff pack)
 ├── backend/         # Django + DRF (config, apps/accounts|academics|attendance|reporting, tests)
 ├── frontend/        # React + Vite + TS (role dashboards, attendance marking, reports)
-├── docs/            # api, data-model, test-plan, deployment, decisions
 └── README.md
 ```
 
@@ -31,7 +27,7 @@ python manage.py createsuperuser   # create your ADMIN (username/email/password)
 python manage.py seed_demo         # optional demo data: 2 teachers, 5 students, sessions
 python manage.py runserver 127.0.0.1:8000
 ```
-Check: open http://127.0.0.1:8000/api/v1/health/ → `{"status":"ok"}`. API docs: `/api/v1/docs/`.
+
 
 Demo logins (local only): `admin` keeps your own password; every teacher and student uses their **username as password** (e.g. `anita`/`anita`, `sara`/`sara`).
 
